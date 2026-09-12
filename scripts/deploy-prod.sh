@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Run as the app's dedicated system user, from the app directory, e.g.:
-#   sudo -u attendance bash -c 'cd /var/www/attendance/app && bash scripts/deploy-prod.sh'
+# Run as the app's dedicated system user, e.g.:
+#   sudo -u attendance /var/www/attendance/app/scripts/deploy-prod.sh
 set -euo pipefail
+
+cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 git pull --ff-only origin main
 
