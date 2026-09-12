@@ -1,0 +1,33 @@
+name: attendance
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: attendance
+      POSTGRES_USER: attendance
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - attendance_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U attendance"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://attendance:${POSTGRES_PASSWORD}@postgres:5432/attendance
+      HOST: 0.0.0.0
+    ports:
+      - "127.0.0.1:3010:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+volumes:
+  attendance_pgdata:
+    name: attendance_pgdata
