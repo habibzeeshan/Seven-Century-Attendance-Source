@@ -85,14 +85,19 @@ The initial production administrator is created on an empty migrated database us
 
 Business dates are derived on the server in `Asia/Dubai`. Fetching today's attendance inserts missing records with `NOT_UPDATED` using a unique agent/date key. It never overwrites yesterday. A date included with an update is only a freshness check, so an open screen cannot silently write to the next day. Current totals exclude inactive agents; historical records remain. A deactivated team blocks its leader's access, while its active agents remain visible to admins for reassignment.
 
+Attendance statuses are stored in a `Status` table, not a fixed list. The 9 built-in statuses (Present/Office, Viewing, Meeting, Developer Office, TruCheck, Absent, Sick, Leave, and the system default Not Updated) ship as seeded rows; admins can add further statuses from Settings and edit any status's label, color, or icon. Custom statuses never affect the dashboard's Working/Absent/Sick/Leave totals (those are computed from each built-in status's fixed role) and appear in a separate "Other statuses" breakdown instead. Statuses can only be deactivated, never deleted, so historical records always resolve to a valid label. `Not Updated` is a protected system status and cannot be edited or deactivated.
+
 Main API modules:
 
 - `/api/auth/login`, `/logout`, `/me`, `/forgot-password`, `/reset-password`
 - `/api/me/team`, `/api/me/team/attendance`
+- `/api/statuses`
 - `PATCH /api/attendance/:agentId`
 - `/api/admin/dashboard`, `/attendance`, `/team-completion`
 - `/api/admin/teams`, `/agents`, `/users` (GET, POST and PATCH by ID)
 - `/api/admin/settings` (GET, PATCH)
+- `/api/admin/statuses` (GET, POST), `/api/admin/statuses/:key` (PATCH)
+- `/api/admin/uploads/avatar` (POST)
 - `/api/admin/history`, `/api/admin/agents/:id/history`, `/api/admin/agents/:id/history/:date`
 
 Attendance/history support filters and pagination. CSV export respects current attendance filters and escapes formulas. Dashboard totals and team completion update through Socket.IO with 30-second polling as fallback. Team Leaders support multiple assigned teams. The deadline is informational and never prevents changes.

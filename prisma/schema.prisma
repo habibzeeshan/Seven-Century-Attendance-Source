@@ -8,16 +8,28 @@ enum UserRole {
   ADMIN
   TEAM_LEADER
 }
-enum AttendanceStatus {
-  NOT_UPDATED
-  PRESENT_OFFICE
-  VIEWING
-  MEETING
-  DEVELOPER_OFFICE
-  TRUCHECK
+enum StatusRole {
+  WORKING
   ABSENT
   SICK
   LEAVE
+  PENDING
+  CUSTOM
+}
+model Status {
+  key String @id @db.VarChar(60)
+  label String @db.VarChar(60)
+  color String @db.VarChar(20)
+  icon String @db.VarChar(40)
+  role StatusRole
+  sortOrder Int @default(0)
+  active Boolean @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  currentFor DailyAttendance[] @relation("currentStatus")
+  previousIn AttendanceHistory[] @relation("previousStatus")
+  newIn AttendanceHistory[] @relation("newStatus")
+  @@index([active,sortOrder])
 }
 model User {
   id String @id @default(uuid()) @db.Uuid
@@ -89,7 +101,8 @@ model DailyAttendance {
   teamId String? @db.Uuid
   team Team? @relation(fields:[teamId],references:[id],onDelete:Restrict)
   leaderIdSnapshot String? @db.Uuid
-  currentStatus AttendanceStatus @default(NOT_UPDATED)
+  currentStatus String @default("NOT_UPDATED") @db.VarChar(60)
+  status Status @relation("currentStatus",fields:[currentStatus],references:[key],onDelete:Restrict)
   lastUpdatedAt DateTime? @db.Timestamptz
   lastUpdatedById String? @db.Uuid
   lastUpdatedBy User? @relation(fields:[lastUpdatedById],references:[id],onDelete:Restrict)
@@ -104,8 +117,10 @@ model AttendanceHistory {
   agentId String @db.Uuid
   agent Agent @relation(fields:[agentId],references:[id],onDelete:Restrict)
   attendanceDate DateTime @db.Date
-  previousStatus AttendanceStatus?
-  newStatus AttendanceStatus
+  previousStatus String? @db.VarChar(60)
+  previous Status? @relation("previousStatus",fields:[previousStatus],references:[key],onDelete:Restrict)
+  newStatus String @db.VarChar(60)
+  new Status @relation("newStatus",fields:[newStatus],references:[key],onDelete:Restrict)
   changedById String @db.Uuid
   changedBy User @relation(fields:[changedById],references:[id],onDelete:Restrict)
   changedAt DateTime @default(now()) @db.Timestamptz

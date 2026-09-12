@@ -7,15 +7,17 @@ import {createWriteStream} from 'node:fs';
 import {mkdir,rm} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {pipeline} from 'node:stream/promises';
-import {agentSchema,teamSchema,userSchema,createUserSchema,settingsSchema} from '../../../packages/shared/src/index.js';
+import {agentSchema,teamSchema,userSchema,createUserSchema,settingsSchema,newStatusSchema,editStatusSchema} from '../../../packages/shared/src/index.js';
 import {authTools,userSelect} from './auth.js';
-import {teamInclude,serial} from './attendance.js';
+import {teamInclude,serial,activeStatuses} from './attendance.js';
 import type {Env} from './env.js';
 import {ApiError} from './errors.js';
 const idParam=z.object({id:z.uuid()});
+const statusKeyParam=z.object({key:z.string().min(1).max(60)});
 const avatarMimeExt:Record<string,string>={'image/jpeg':'jpg','image/png':'png','image/webp':'webp'};
 const avatarDir=resolve('uploads/avatars');
 async function deleteUploadedAvatar(avatarUrl:string|null|undefined){if(avatarUrl?.startsWith('/uploads/avatars/'))await rm(resolve('uploads',avatarUrl.slice('/uploads/'.length)),{force:true});}
+function slugifyStatusKey(label:string){const base=label.toUpperCase().replace(/[^A-Z0-9]+/g,'_').replace(/^_+|_+$/g,'')||'STATUS';return /^[0-9]/.test(base)?'S_'+base:base;}
 export async function managementRoutes(app:FastifyInstance,db:PrismaClient,env:Env,broadcast:()=>Promise<void>){const {requireAdmin}=authTools(db,env);
  app.get('/api/admin/teams',{preHandler:requireAdmin},async()=>db.team.findMany({include:{...teamInclude,_count:{select:{agents:{where:{active:true}}}}},orderBy:{name:'asc'}}));
  app.get('/api/admin/teams/:id',{preHandler:requireAdmin},async req=>{const {id}=idParam.parse(req.params);const team=await db.team.findUnique({where:{id},include:{...teamInclude,agents:{orderBy:{fullName:'asc'}}}});if(!team)throw new ApiError(404,'NOT_FOUND','Team not found.');return team;});
@@ -28,4 +30,7 @@ export async function managementRoutes(app:FastifyInstance,db:PrismaClient,env:E
  app.post('/api/admin/uploads/avatar',{preHandler:requireAdmin},async req=>{const data=await req.file();if(!data)throw new ApiError(400,'NO_FILE','Choose an image to upload.');const ext=avatarMimeExt[data.mimetype];if(!ext)throw new ApiError(400,'INVALID_TYPE','Only JPEG, PNG, or WEBP images are allowed.');await mkdir(avatarDir,{recursive:true});const filename=`${randomUUID()}.${ext}`;const filePath=resolve(avatarDir,filename);await pipeline(data.file,createWriteStream(filePath));if(data.file.truncated){await rm(filePath,{force:true});throw new ApiError(400,'FILE_TOO_LARGE','Image must be 3MB or smaller.');}return {avatarUrl:`/uploads/avatars/${filename}`};});
  app.get('/api/admin/settings',{preHandler:requireAdmin},async()=>db.systemSettings.findUniqueOrThrow({where:{id:1}}));
  app.patch('/api/admin/settings',{preHandler:requireAdmin},async req=>{const data=settingsSchema.parse(req.body);return db.systemSettings.update({where:{id:1},data:{...data,logoUrl:data.logoUrl||null}});});
+ app.get('/api/admin/statuses',{preHandler:requireAdmin},async()=>activeStatuses(db));
+ app.post('/api/admin/statuses',{preHandler:requireAdmin},async req=>{const input=newStatusSchema.parse(req.body);const key=slugifyStatusKey(input.label);const maxSort=await db.status.aggregate({_max:{sortOrder:true}});return db.status.create({data:{...input,key,role:'CUSTOM',sortOrder:(maxSort._max.sortOrder??0)+1}});});
+ app.patch('/api/admin/statuses/:key',{preHandler:requireAdmin},async req=>{const {key}=statusKeyParam.parse(req.params);if(key==='NOT_UPDATED')throw new ApiError(400,'PROTECTED_STATUS','This status cannot be edited.');const input=editStatusSchema.parse(req.body);return db.status.update({where:{key},data:input});});
 }
