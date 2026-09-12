@@ -20,12 +20,13 @@ export function isOverdue(deadline:string,now=new Date()){return new Intl.DateTi
 export function summarize(rows:{currentStatus:AttendanceStatus}[]){const counts=Object.fromEntries(statusValues.map(s=>[s,0])) as Record<AttendanceStatus,number>;rows.forEach(r=>counts[r.currentStatus]++);const total=rows.length,updated=total-counts.NOT_UPDATED;return {total,updated,percent:total?Math.round(updated/total*100):0,counts,working:statusValues.filter(s=>statusConfig[s].category==='working').reduce((n,s)=>n+counts[s],0)};}
 const name=z.string().trim().min(1,'Required').max(120);
 const url=z.union([z.literal(''),z.url().max(1000).refine(v=>v.startsWith('https://'),'Use an HTTPS URL')]).nullable();
+const avatarPath=z.union([z.literal(''),z.url().max(1000).refine(v=>v.startsWith('https://'),'Use an HTTPS URL'),z.string().regex(/^\/uploads\/avatars\/[a-zA-Z0-9_-]+\.(jpg|jpeg|png|webp)$/,'Invalid avatar')]).nullable();
 export const loginSchema=z.object({email:z.email().transform(s=>s.toLowerCase()),password:z.string().min(1).max(128)});
 export const passwordSchema=z.string().min(12,'Use at least 12 characters').max(72,'Use at most 72 characters').refine(s=>new TextEncoder().encode(s).length<=72,'Password must be at most 72 bytes');
 export const attendanceSchema=z.object({status:z.enum(statusValues),date:z.iso.date().optional()}).strict();
-export const agentSchema=z.object({fullName:name,jobTitle:name,teamId:z.uuid().nullable(),employeeCode:z.string().trim().max(80).nullable(),avatarUrl:url,active:z.boolean()});
+export const agentSchema=z.object({fullName:name,jobTitle:name,teamId:z.uuid().nullable(),employeeCode:z.string().trim().max(80).nullable(),avatarUrl:avatarPath,active:z.boolean()});
 export const teamSchema=z.object({name,teamLeaderId:z.uuid().nullable(),active:z.boolean()});
-export const userSchema=z.object({fullName:name,email:z.email().transform(s=>s.toLowerCase()),role:z.enum(['ADMIN','TEAM_LEADER']),active:z.boolean(),phone:z.string().max(40).nullable(),avatarUrl:url});
+export const userSchema=z.object({fullName:name,email:z.email().transform(s=>s.toLowerCase()),role:z.enum(['ADMIN','TEAM_LEADER']),active:z.boolean(),phone:z.string().max(40).nullable(),avatarUrl:avatarPath});
 export const createUserSchema=userSchema.extend({password:passwordSchema});
 export const settingsSchema=z.object({companyName:name,attendanceDeadline:z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),logoUrl:url});
 export const filtersSchema=z.object({date:z.iso.date().optional(),from:z.iso.date().optional(),to:z.iso.date().optional(),teamId:z.uuid().optional(),leaderId:z.uuid().optional(),agentId:z.uuid().optional(),status:z.enum(statusValues).optional(),search:z.string().max(120).optional(),page:z.coerce.number().int().min(1).default(1),pageSize:z.coerce.number().int().min(1).max(100).default(30)});

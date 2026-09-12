@@ -22,8 +22,10 @@ services:
       DATABASE_URL: postgresql://attendance:${POSTGRES_PASSWORD:-local-development-only}@postgres:5432/attendance
       HOST: 0.0.0.0
     ports: ["3001:3001"]
+    volumes: ["uploads_data:/app/uploads"]
     depends_on:
       postgres:
         condition: service_healthy
 volumes:
   postgres_data:
+  uploads_data:

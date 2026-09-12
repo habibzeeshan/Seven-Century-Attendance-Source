@@ -25,9 +25,13 @@ services:
       HOST: 0.0.0.0
     ports:
       - "127.0.0.1:3010:3001"
+    volumes:
+      - attendance_uploads:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
 volumes:
   attendance_pgdata:
     name: attendance_pgdata
+  attendance_uploads:
+    name: attendance_uploads
