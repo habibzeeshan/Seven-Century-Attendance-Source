@@ -1,0 +1,5 @@
+import {useMutation} from '@tanstack/react-query';
+import {useNavigate} from 'react-router-dom';
+import {api,json,queryClient,useAuth} from '../api';
+import {Avatar,ErrorBox,PageHeader} from '../components/ui';
+export default function Profile(){const {data}=useAuth(),user=data!.user,navigate=useNavigate();const logout=useMutation({mutationFn:()=>api('/auth/logout',json('POST',{})),onSuccess:()=>{queryClient.clear();navigate('/login',{replace:true});}});return <><PageHeader eyebrow="YOUR ACCOUNT" title="Profile"/><section className="panel profile-panel"><Avatar name={user.fullName} url={user.avatarUrl}/><h2>{user.fullName}</h2><p className="muted">{user.role==='ADMIN'?'Administrator':'Team Leader'}</p><dl><dt>Email</dt><dd>{user.email}</dd><dt>Phone</dt><dd>{user.phone??'Not provided'}</dd><dt>Timezone</dt><dd>Asia/Dubai</dd></dl>{logout.error&&<ErrorBox error={logout.error}/>}<button className="button dark" disabled={logout.isPending} onClick={()=>logout.mutate()}>Sign out</button></section></>;}

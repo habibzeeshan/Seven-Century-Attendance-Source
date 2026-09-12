@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+}
+enum UserRole {
+  ADMIN
+  TEAM_LEADER
+}
+enum AttendanceStatus {
+  NOT_UPDATED
+  PRESENT_OFFICE
+  VIEWING
+  MEETING
+  DEVELOPER_OFFICE
+  TRUCHECK
+  ABSENT
+  SICK
+  LEAVE
+}
+model User {
+  id String @id @default(uuid()) @db.Uuid
+  fullName String @db.VarChar(120)
+  email String @unique @db.VarChar(254)
+  passwordHash String
+  role UserRole
+  phone String?
+  avatarUrl String?
+  active Boolean @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  lastLoginAt DateTime? @db.Timestamptz
+  teams Team[]
+  attendance DailyAttendance[]
+  history AttendanceHistory[]
+  sessions Session[]
+  resets PasswordReset[]
+  @@index([active])
+}
+model Session {
+  id String @id
+  userId String @db.Uuid
+  user User @relation(fields:[userId],references:[id],onDelete:Restrict)
+  expiresAt DateTime @db.Timestamptz
+  createdAt DateTime @default(now()) @db.Timestamptz
+  @@index([userId])
+  @@index([expiresAt])
+}
+model PasswordReset {
+  id String @id
+  userId String @db.Uuid
+  user User @relation(fields:[userId],references:[id],onDelete:Restrict)
+  expiresAt DateTime @db.Timestamptz
+  @@index([userId])
+}
+model Team {
+  id String @id @default(uuid()) @db.Uuid
+  name String @db.VarChar(120)
+  teamLeaderId String? @db.Uuid
+  teamLeader User? @relation(fields:[teamLeaderId],references:[id],onDelete:Restrict)
+  active Boolean @default(true)
+  agents Agent[]
+  attendance DailyAttendance[]
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  @@index([teamLeaderId])
+}
+model Agent {
+  id String @id @default(uuid()) @db.Uuid
+  fullName String @db.VarChar(120)
+  jobTitle String @default("Property Consultant") @db.VarChar(120)
+  employeeCode String? @unique @db.VarChar(80)
+  avatarUrl String?
+  teamId String? @db.Uuid
+  team Team? @relation(fields:[teamId],references:[id],onDelete:Restrict)
+  active Boolean @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  attendance DailyAttendance[]
+  history AttendanceHistory[]
+  @@index([teamId,active])
+}
+model DailyAttendance {
+  id String @id @default(uuid()) @db.Uuid
+  agentId String @db.Uuid
+  agent Agent @relation(fields:[agentId],references:[id],onDelete:Restrict)
+  attendanceDate DateTime @db.Date
+  teamId String? @db.Uuid
+  team Team? @relation(fields:[teamId],references:[id],onDelete:Restrict)
+  leaderIdSnapshot String? @db.Uuid
+  currentStatus AttendanceStatus @default(NOT_UPDATED)
+  lastUpdatedAt DateTime? @db.Timestamptz
+  lastUpdatedById String? @db.Uuid
+  lastUpdatedBy User? @relation(fields:[lastUpdatedById],references:[id],onDelete:Restrict)
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  @@unique([agentId,attendanceDate])
+  @@index([attendanceDate,currentStatus])
+  @@index([teamId,attendanceDate])
+}
+model AttendanceHistory {
+  id String @id @default(uuid()) @db.Uuid
+  agentId String @db.Uuid
+  agent Agent @relation(fields:[agentId],references:[id],onDelete:Restrict)
+  attendanceDate DateTime @db.Date
+  previousStatus AttendanceStatus?
+  newStatus AttendanceStatus
+  changedById String @db.Uuid
+  changedBy User @relation(fields:[changedById],references:[id],onDelete:Restrict)
+  changedAt DateTime @default(now()) @db.Timestamptz
+  @@index([agentId,attendanceDate,changedAt])
+  @@index([attendanceDate])
+}
+model SystemSettings {
+  id Int @id @default(1)
+  companyName String @default("Seven Century Real Estate Brokers LLC") @db.VarChar(120)
+  timezone String @default("Asia/Dubai")
+  attendanceDeadline String @default("10:00") @db.VarChar(5)
+  logoUrl String?
+  updatedAt DateTime @updatedAt @db.Timestamptz
+}

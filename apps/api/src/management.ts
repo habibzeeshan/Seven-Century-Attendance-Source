@@ -1,0 +1,22 @@
+import type {PrismaClient} from '@prisma/client';
+import type {FastifyInstance} from 'fastify';
+import bcrypt from 'bcryptjs';
+import {z} from 'zod';
+import {agentSchema,teamSchema,userSchema,createUserSchema,settingsSchema} from '../../../packages/shared/src/index.js';
+import {authTools,userSelect} from './auth.js';
+import {teamInclude,serial} from './attendance.js';
+import type {Env} from './env.js';
+import {ApiError} from './errors.js';
+const idParam=z.object({id:z.uuid()});
+export async function managementRoutes(app:FastifyInstance,db:PrismaClient,env:Env,broadcast:()=>Promise<void>){const {requireAdmin}=authTools(db,env);
+ app.get('/api/admin/teams',{preHandler:requireAdmin},async()=>db.team.findMany({include:{...teamInclude,_count:{select:{agents:{where:{active:true}}}}},orderBy:{name:'asc'}}));
+ app.get('/api/admin/teams/:id',{preHandler:requireAdmin},async req=>{const {id}=idParam.parse(req.params);const team=await db.team.findUnique({where:{id},include:{...teamInclude,agents:{orderBy:{fullName:'asc'}}}});if(!team)throw new ApiError(404,'NOT_FOUND','Team not found.');return team;});
+ for(const method of ['POST','PATCH'] as const)app.route({method,url:'/api/admin/teams'+(method==='PATCH'?'/:id':''),preHandler:requireAdmin,handler:async req=>{const input=teamSchema.parse(req.body);const id=method==='PATCH'?idParam.parse(req.params).id:undefined;const result=await serial(db,async tx=>{if(input.teamLeaderId&&!await tx.user.findFirst({where:{id:input.teamLeaderId,role:'TEAM_LEADER',active:true}}))throw new ApiError(400,'INVALID_LEADER','Choose an active Team Leader.');return id?tx.team.update({where:{id},data:input}):tx.team.create({data:input});});await broadcast();return result;}});
+ app.get('/api/admin/agents',{preHandler:requireAdmin},async()=>db.agent.findMany({include:{team:{include:teamInclude}},orderBy:{fullName:'asc'}}));
+ for(const method of ['POST','PATCH'] as const)app.route({method,url:'/api/admin/agents'+(method==='PATCH'?'/:id':''),preHandler:requireAdmin,handler:async req=>{const input=agentSchema.parse(req.body);const id=method==='PATCH'?idParam.parse(req.params).id:undefined;const result=await serial(db,async tx=>{if(input.teamId&&!await tx.team.findFirst({where:{id:input.teamId,active:true}}))throw new ApiError(400,'INVALID_TEAM','Choose an active team.');const data={...input,employeeCode:input.employeeCode||null,avatarUrl:input.avatarUrl||null};return id?tx.agent.update({where:{id},data}):tx.agent.create({data});});await broadcast();return result;}});
+ app.get('/api/admin/users',{preHandler:requireAdmin},async()=>db.user.findMany({select:userSelect,orderBy:{fullName:'asc'}}));
+ app.post('/api/admin/users',{preHandler:requireAdmin},async req=>{const {password,...input}=createUserSchema.parse(req.body);return db.user.create({data:{...input,passwordHash:await bcrypt.hash(password,12)},select:userSelect});});
+ app.patch('/api/admin/users/:id',{preHandler:requireAdmin},async req=>{const {id}=idParam.parse(req.params),input=userSchema.parse(req.body);if(id===req.user.id&&(!input.active||input.role!=='ADMIN'))throw new ApiError(400,'SELF_CHANGE','You cannot deactivate or demote your own account.');const result=await serial(db,async tx=>{if(input.role!=='TEAM_LEADER'&&await tx.team.count({where:{teamLeaderId:id,active:true}}))throw new ApiError(400,'ASSIGNED_TEAMS','Reassign this user’s teams before changing their role.');const user=await tx.user.update({where:{id},data:input,select:userSelect});await tx.session.deleteMany({where:{userId:id}});return user;});await broadcast();return result;});
+ app.get('/api/admin/settings',{preHandler:requireAdmin},async()=>db.systemSettings.findUniqueOrThrow({where:{id:1}}));
+ app.patch('/api/admin/settings',{preHandler:requireAdmin},async req=>{const data=settingsSchema.parse(req.body);return db.systemSettings.update({where:{id:1},data:{...data,logoUrl:data.logoUrl||null}});});
+}
