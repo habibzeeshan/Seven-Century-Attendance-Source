@@ -83,6 +83,7 @@ model Agent {
   fullName String @db.VarChar(120)
   jobTitle String @default("Property Consultant") @db.VarChar(120)
   employeeCode String? @unique @db.VarChar(80)
+  email String? @unique @db.VarChar(254)
   avatarUrl String?
   teamId String? @db.Uuid
   team Team? @relation(fields:[teamId],references:[id],onDelete:Restrict)
