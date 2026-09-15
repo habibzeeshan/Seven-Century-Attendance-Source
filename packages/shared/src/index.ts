@@ -25,7 +25,8 @@ export const teamSchema=z.object({name,teamLeaderId:z.uuid().nullable(),active:z
 export const userSchema=z.object({fullName:name,email:z.email().transform(s=>s.toLowerCase()),role:z.enum(['ADMIN','TEAM_LEADER']),active:z.boolean(),phone:z.string().max(40).nullable(),avatarUrl:avatarPath});
 export const createUserSchema=userSchema.extend({password:passwordSchema});
 export const settingsSchema=z.object({companyName:name,attendanceDeadline:z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),logoUrl:url});
-export const filtersSchema=z.object({date:z.iso.date().optional(),from:z.iso.date().optional(),to:z.iso.date().optional(),teamId:z.uuid().optional(),leaderId:z.uuid().optional(),agentId:z.uuid().optional(),status:z.string().max(60).optional(),search:z.string().max(120).optional(),page:z.coerce.number().int().min(1).default(1),pageSize:z.coerce.number().int().min(1).max(100).default(30)});
+export const statusRoles=['WORKING','ABSENT','SICK','LEAVE','PENDING','CUSTOM'] as const;
+export const filtersSchema=z.object({date:z.iso.date().optional(),from:z.iso.date().optional(),to:z.iso.date().optional(),teamId:z.uuid().optional(),leaderId:z.uuid().optional(),agentId:z.uuid().optional(),status:z.string().max(60).optional(),role:z.enum(statusRoles).optional(),search:z.string().max(120).optional(),page:z.coerce.number().int().min(1).default(1),pageSize:z.coerce.number().int().min(1).max(100).default(30)});
 export const dashboardRangeSchema=z.object({from:z.iso.date().optional(),to:z.iso.date().optional()});
 export interface UserDto{id:string;fullName:string;email:string;role:UserRole;active:boolean;phone:string|null;avatarUrl:string|null;lastLoginAt:string|null}
 export interface TeamDto{id:string;name:string;teamLeaderId:string|null;active:boolean;teamLeader:UserDto|null;_count?:{agents:number}}
